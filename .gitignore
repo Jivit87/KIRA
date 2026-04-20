@@ -1,0 +1,126 @@
+# ─────────────────────────────────────────────
+# SECRETS & CONFIG
+# ─────────────────────────────────────────────
+.env
+.env.*
+!.env.example
+config.local.yaml
+
+# ─────────────────────────────────────────────
+# BAILEYS AUTH — WhatsApp session files
+# These contain your WA credentials — never commit
+# ─────────────────────────────────────────────
+baileys/auth/
+baileys/auth/**
+
+# ─────────────────────────────────────────────
+# NODE.JS
+# ─────────────────────────────────────────────
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.npm
+.yarn/
+package-lock.json
+
+# ─────────────────────────────────────────────
+# PYTHON
+# ─────────────────────────────────────────────
+__pycache__/
+*.py[cod]
+*$py.class
+*.pyo
+*.pyd
+*.so
+
+# Virtual environments
+agent/.venv/
+.venv/
+venv/
+env/
+ENV/
+
+# Distribution / packaging
+.eggs/
+*.egg-info/
+dist/
+build/
+*.egg
+MANIFEST
+
+# pytest / coverage
+.pytest_cache/
+.coverage
+htmlcov/
+.mypy_cache/
+.ruff_cache/
+
+# ─────────────────────────────────────────────
+# DATA STORES
+# ─────────────────────────────────────────────
+
+# ChromaDB vector store (can be large)
+data/
+*.db
+*.sqlite
+*.sqlite3
+
+# Mem0 local cache
+.mem0/
+
+# ─────────────────────────────────────────────
+# LOGS
+# ─────────────────────────────────────────────
+*.log
+logs/
+/tmp/wa-*.log
+/tmp/wa-*.err
+
+# ─────────────────────────────────────────────
+# macOS
+# ─────────────────────────────────────────────
+.DS_Store
+.AppleDouble
+.LSOverride
+._*
+.Spotlight-V100
+.Trashes
+Icon
+
+# ─────────────────────────────────────────────
+# DOCKER
+# ─────────────────────────────────────────────
+# Keep docker-compose.yml but ignore overrides
+docker-compose.override.yml
+
+# ─────────────────────────────────────────────
+# EDITORS & IDES
+# ─────────────────────────────────────────────
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.cursor/
+
+# ─────────────────────────────────────────────
+# PLAYWRIGHT
+# ─────────────────────────────────────────────
+playwright-report/
+test-results/
+
+# ─────────────────────────────────────────────
+# MISC
+# ─────────────────────────────────────────────
+*.bak
+*.tmp
+*.orig
+.DS_Store
+Thumbs.db
+
+# ─────────────────────────────────────────────
+# PROJECT DOCS (local only)
+# ─────────────────────────────────────────────
+about.md
+phases.md

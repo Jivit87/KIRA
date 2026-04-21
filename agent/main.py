@@ -7,6 +7,7 @@ from pydantic import BaseModel
 from fastapi import FastAPI
 from memory.mem0_client import add_memory, search_memory
 from intent.classifier import classify_intent
+from tools.router import run_action
 
 app = FastAPI()
 groq_client = Groq() 
@@ -60,7 +61,7 @@ async def handle_message(msg: Message):
             reply = response.choices[0].message.content
 
         elif intent == "action":
-            reply = "Got it, will perform action soon"
+            reply = run_action(user_text)
 
         elif intent == "plan":
             reply = "Got it, will plan and execute soon"  

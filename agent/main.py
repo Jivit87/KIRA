@@ -11,7 +11,6 @@ from tools.router import run_action
 
 from confirmation import store_confirmation, get_confirmation, clear_confirmation
 from utils.risk_detector import is_risky
-import uuid
 
 app = FastAPI()
 groq_client = Groq() 
@@ -30,15 +29,15 @@ Keep replies short and natural.
 async def handle_message(msg: Message):
     try:
         user_text = msg.text.lower()
-        msg_id = str(uuid.uuid4())
+        sender = msg.sender # this will return number, it will act as unique id
 
         # check confirmation
         if user_text in ["yes", "no"]:
-            pending = get_confirmation("last")
+            pending = get_confirmation(sender)
             if not pending:
                 return {"reply": "No pending action"}
 
-            clear_confirmation("last")
+            clear_confirmation(sender)
 
             if user_text == "no":
                 return {"reply": "Action cancelled"}   
@@ -83,7 +82,7 @@ async def handle_message(msg: Message):
 
         elif intent == "action":
             if is_risky(user_text):
-                store_confirmation("last", {"original_text": user_text})
+                store_confirmation(sender, {"original_text": user_text})
                 return {
                     "reply": "This action is risky, do you want to continue? (yes/no)"
                 }

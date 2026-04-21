@@ -1,16 +1,15 @@
 import os 
 from dotenv import load_dotenv
-
-# Ensure env vars are loaded before dependent modules parse them
 load_dotenv()
 
 from groq import Groq
 from pydantic import BaseModel
 from fastapi import FastAPI
 from memory.mem0_client import add_memory, search_memory
+from intent.classifier import classify_intent
 
 app = FastAPI()
-groq_client = Groq() # automatically picks up GROQ_API_KEY from env
+groq_client = Groq() 
 
 class Message(BaseModel):
     text: str
@@ -27,6 +26,10 @@ async def handle_message(msg: Message):
     try:
         user_text = msg.text
 
+        # classify intent
+        intent = classify_intent(user_text)["intent"]
+        print("Intent:", intent)
+
         # retrieve memory safely
         memory_result = search_memory(user_text)
         
@@ -42,18 +45,29 @@ async def handle_message(msg: Message):
             str(m.get("memory", ""))
             for m in mem_list
             if isinstance(m, dict) and "memory" in m
-        )       
+        )  
 
-        response = groq_client.chat.completions.create(
-            model=os.getenv("GROQ_MODEL", "llama-3.3-70b-versatile"),
-            messages=[
-                {"role": "system", "content": SYSTEM_PROMPT},
-          
-                {"role": "user", "content": f"Context:\n{memory_context}\n\nUser: {user_text}"}
-            ]
-        )
+        if intent == "chat":    
+            response = groq_client.chat.completions.create(
+                model=os.getenv("GROQ_MODEL", "llama-3.3-70b-versatile"),
+                messages=[
+                    {"role": "system", "content": SYSTEM_PROMPT},
+            
+                    {"role": "user", "content": f"Context:\n{memory_context}\n\nUser: {user_text}"}
+                ]
+            )
 
-        reply = response.choices[0].message.content
+            reply = response.choices[0].message.content
+
+        elif intent == "action":
+            reply = "Got it, will perform action soon"
+
+        elif intent == "plan":
+            reply = "Got it, will plan and execute soon"  
+
+        else:
+            reply = "I'm not sure what you mean, can you rephrase?"      
+            
 
         # save memory
         add_memory(user_text, reply)

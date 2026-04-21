@@ -14,6 +14,9 @@ from utils.risk_detector import is_risky
 
 from streaming import stream_status
 
+from planner.planner import create_plan
+from planner.executor import execute_plan
+
 app = FastAPI()
 groq_client = Groq() 
 
@@ -97,7 +100,10 @@ async def handle_message(msg: Message):
             
 
         elif intent == "plan":
-            reply = "Got it, will plan and execute soon"  
+            plan = create_plan(original_text)
+            await stream_status("Creating plan...", sender)
+            await execute_plan(plan, sender)
+            return {"reply": "Working on it..."}
 
         else:
             reply = "I'm not sure what you mean, can you rephrase?"      

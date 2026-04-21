@@ -1,8 +1,10 @@
 const axios = require("axios");
 
 async function startListener(sock) {
-    sock.ev.on("messages.upsert", async ({ messages }) => {
-        const msg = messages[0];
+    sock.ev.on("messages.upsert", async (m) => {
+        if (m.type !== "notify") return;
+        
+        const msg = m.messages[0];
         if (!msg.message) return;
 
         // Only process your own messages

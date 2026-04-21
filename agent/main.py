@@ -9,6 +9,10 @@ from memory.mem0_client import add_memory, search_memory
 from intent.classifier import classify_intent
 from tools.router import run_action
 
+from confirmation import store_confirmation, get_confirmation, clear_confirmation
+from utils.risk_detector import is_risky
+import uuid
+
 app = FastAPI()
 groq_client = Groq() 
 
@@ -25,7 +29,24 @@ Keep replies short and natural.
 @app.post("/message")
 async def handle_message(msg: Message):
     try:
-        user_text = msg.text
+        user_text = msg.text.lower()
+        msg_id = str(uuid.uuid4())
+
+        # check confirmation
+        if user_text in ["yes", "no"]:
+            pending = get_confirmation("last")
+            if not pending:
+                return {"reply": "No pending action"}
+
+            clear_confirmation("last")
+
+            if user_text == "no":
+                return {"reply": "Action cancelled"}   
+
+            # if yes
+            result = run_action(pending["original_text"])
+            return {"reply": f"Executed: {result}"}
+                
 
         # classify intent
         intent = classify_intent(user_text)["intent"]
@@ -61,6 +82,12 @@ async def handle_message(msg: Message):
             reply = response.choices[0].message.content
 
         elif intent == "action":
+            if is_risky(user_text):
+                store_confirmation("last", {"original_text": user_text})
+                return {
+                    "reply": "This action is risky, do you want to continue? (yes/no)"
+                }
+            # if not risky
             reply = run_action(user_text)
 
         elif intent == "plan":

@@ -12,6 +12,8 @@ from tools.router import run_action
 from confirmation import store_confirmation, get_confirmation, clear_confirmation
 from utils.risk_detector import is_risky
 
+from streaming import stream_status
+
 app = FastAPI()
 groq_client = Groq() 
 
@@ -28,7 +30,8 @@ Keep replies short and natural.
 @app.post("/message")
 async def handle_message(msg: Message):
     try:
-        user_text = msg.text.lower()
+        original_text = msg.text # for execute/confirmation/memories
+        user_text = msg.text.lower() # for intent/risk detector
         sender = msg.sender # this will return number, it will act as unique id
 
         # check confirmation
@@ -43,7 +46,9 @@ async def handle_message(msg: Message):
                 return {"reply": "Action cancelled"}   
 
             # if yes
+            await stream_status("⏳ Working on it...", sender)
             result = run_action(pending["original_text"])
+            await stream_status(f"✅ {result}", sender)
             return {"reply": f"Executed: {result}"}
                 
 
@@ -82,12 +87,14 @@ async def handle_message(msg: Message):
 
         elif intent == "action":
             if is_risky(user_text):
-                store_confirmation(sender, {"original_text": user_text})
+                store_confirmation(sender, {"original_text": original_text})
                 return {
                     "reply": "This action is risky, do you want to continue? (yes/no)"
                 }
             # if not risky
-            reply = run_action(user_text)
+            await stream_status("⏳ Working on it...", sender)
+            reply = run_action(original_text)
+            
 
         elif intent == "plan":
             reply = "Got it, will plan and execute soon"  

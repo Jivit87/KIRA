@@ -1,0 +1,18 @@
+version: "3.9"
+
+services:
+  # Redis — stores sessions, confirmations, rate-limit state
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "127.0.0.1:6379:6379"  # only accessible locally
+    restart: unless-stopped
+
+  # ChromaDB — vector store for long-term memory (Mem0 uses this)
+  chromadb:
+    image: chromadb/chroma:latest
+    ports:
+      - "127.0.0.1:8000:8000"  # only accessible locally
+    volumes:
+      - ./agent/chroma_db:/chroma/chroma  # persist data on disk
+    restart: unless-stopped

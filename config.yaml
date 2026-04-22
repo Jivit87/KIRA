@@ -1,0 +1,22 @@
+# Main config for the WhatsApp Mac Agent
+
+llm:
+  provider: groq
+  model: llama-3.3-70b-versatile
+
+embedder:
+  provider: ollama
+  model: nomic-embed-text
+  base_url: http://localhost:11434
+
+ports:
+  agent: 8765    # Python FastAPI
+  baileys: 8766  # Node.js Baileys sender
+
+rate_limit:
+  max_per_minute: 60
+  window_seconds: 60
+
+memory:
+  chroma_path: ./agent/chroma_db
+  collection: whatsapp_agent

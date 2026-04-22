@@ -1,141 +1,34 @@
-import os 
+import os
 from dotenv import load_dotenv
+
+# Load .env before anything else
 load_dotenv()
 
-from groq import Groq
-from pydantic import BaseModel
 from fastapi import FastAPI
-from memory.mem0_client import add_memory, search_memory
-from intent.classifier import classify_intent
-from tools.router import run_action
-
-from confirmation import store_confirmation, get_confirmation, clear_confirmation
-from utils.risk_detector import is_risky
-
-from streaming import stream_status
-
-from planner.planner import create_plan
-from planner.executor import execute_plan
-from planner.state import get_plan_state, clear_plan_state
+from pydantic import BaseModel
+from orchestrator import handle_message
 
 app = FastAPI()
-groq_client = Groq() 
 
+
+# Shape of the incoming message from Baileys
 class Message(BaseModel):
     text: str
-    sender: str
+    msg_id: str
 
-SYSTEM_PROMPT = """
-You are a smart personal assistant on WhatsApp.
-Use past context if relevant.
-Keep replies short and natural.
-"""
 
 @app.post("/message")
-async def handle_message(msg: Message):
-    try:
-        original_text = msg.text # for execute/confirmation/memories
-        user_text = msg.text.lower() # for intent/risk detector
-        sender = msg.sender # this will return number, it will act as unique id
+async def receive_message(msg: Message):
+    """Baileys POSTs here when you send a message to yourself on WhatsApp."""
+    await handle_message(msg.text, msg.msg_id)
+    return {"ok": True}
 
-        # check confirmation
-        if user_text in ["yes", "no"]:
-            pending = get_confirmation(sender)
-            if not pending:
-                return {"reply": "No pending action"}
 
-            clear_confirmation(sender)
+@app.get("/health")
+async def health():
+    """Simple health check — visit http://127.0.0.1:8765/health to verify it's running."""
+    return {"status": "ok"}
 
-            if user_text == "no":
-                return {"reply": "Action cancelled"}   
-
-            # if yes
-            await stream_status("⏳ Working on it...", sender)
-            result = run_action(pending["original_text"])
-            await stream_status(f"✅ {result}", sender)
-            return {"reply": f"Executed: {result}"}
-
-        state = get_plan_state(sender)
-
-        # RESUME PLAN
-        if state:
-            if user_text not in ["yes", "no"]:
-                return {"reply": "⚠️ Please reply YES or NO to continue"}
-
-            plan = state["plan"]
-            step_index = state["step_index"]
-            context = state["context"]
-
-            clear_plan_state(sender)
-
-            await stream_status("🔄 Resuming task...", sender)
-
-            await execute_plan(plan, sender, start_index=step_index, context=context)
-
-            return {"reply": ""}
-
-        # classify intent
-        intent = classify_intent(user_text)["intent"]
-        print("Intent:", intent)
-
-        # retrieve memory safely
-        memory_result = search_memory(user_text)
-        
-        # You’re converting stored memory objects into a clean text context for the AI to use.
-        if isinstance(memory_result, dict):
-            mem_list = memory_result.get("results", [])
-        elif isinstance(memory_result, list):
-            mem_list = memory_result
-        else:
-            mem_list = []
-
-        memory_context = "\n".join(
-            str(m.get("memory", ""))
-            for m in mem_list
-            if isinstance(m, dict) and "memory" in m
-        )  
-
-        if intent == "chat":    
-            response = groq_client.chat.completions.create(
-                model=os.getenv("GROQ_MODEL", "llama-3.3-70b-versatile"),
-                messages=[
-                    {"role": "system", "content": SYSTEM_PROMPT},
-            
-                    {"role": "user", "content": f"Context:\n{memory_context}\n\nUser: {user_text}"}
-                ]
-            )
-
-            reply = response.choices[0].message.content
-
-        elif intent == "action":
-            if is_risky(user_text):
-                store_confirmation(sender, {"original_text": original_text})
-                return {
-                    "reply": "This action is risky, do you want to continue? (yes/no)"
-                }
-            # if not risky
-            await stream_status("⏳ Working on it...", sender)
-            reply = run_action(original_text)
-            
-
-        elif intent == "plan":
-            plan = create_plan(original_text)
-            await stream_status("Creating plan...", sender)
-            await execute_plan(plan, sender)
-            return {"reply": ""}
-
-        else:
-            reply = "I'm not sure what you mean, can you rephrase?"      
-            
-
-        # save memory
-        add_memory(user_text, reply)
-
-        return {"reply": reply}
-
-    except Exception as e:
-        print(f"Error handling request: {e}")
-        return {"reply": f"⚠️ Error processing request: {e}"}
 
 if __name__ == "__main__":
     import uvicorn

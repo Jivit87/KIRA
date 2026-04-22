@@ -7,40 +7,27 @@ async function startListener(sock) {
         const msg = m.messages[0];
         if (!msg.message) return;
 
-        // Only process your own messages
-        if (!msg.key.fromMe) return;
+        // Only process messages from yourself (Saved Messages)
+        const isFromMe = msg.key.fromMe;
+        const isSavedMessages = msg.key.remoteJid === (sock.user?.id.replace(':0@', '@s.whatsapp.net') || '');
+        
+        if (!isFromMe || !isSavedMessages) return;
 
+        // Extract text from message
         const text = msg.message.conversation || msg.message.extendedTextMessage?.text;
+        if (!text || !text.trim()) return;
 
-        if (!text || !text.startsWith("/")) return;
-
-        // Strip the '/' command prefix before sending to the agent
-        const cleanText = text.slice(1).trim();
-
-        const sender = msg.key.remoteJid;
-
-        console.log("📩 Incoming command:", cleanText);
+        console.log("📩 Received:", text);
 
         try {
             // Send to Python agent
-            const res = await axios.post("http://127.0.0.1:8765/message", {
-                text: cleanText,
-                sender
+            await axios.post("http://127.0.0.1:8765/message", {
+                text: text,
+                msg_id: msg.key.id
             });
-
-            const reply = res.data.reply;
-
-            // Send reply back to WhatsApp
-            if (reply) {
-                await sock.sendMessage(sender, { text: reply });
-            }
 
         } catch (err) {
-            console.error("❌ Error:", err.message);
-
-            await sock.sendMessage(sender, {
-                text: "⚠️ Something went wrong"
-            });
+            console.error("❌ Failed to POST to agent:", err.message);
         }
     });
 }

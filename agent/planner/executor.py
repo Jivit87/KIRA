@@ -2,6 +2,7 @@ from tools.router import run_action
 from streaming import stream_status
 from tool_intelligence.router import intelligent_tool_call
 from .state import save_plan_state 
+from tools.research import web_search
 
 FALLBACKS = {
     "open vscode": "open code",
@@ -41,6 +42,13 @@ async def execute_plan(plan, sender, start_index=0, context=None):
             await stream_status(f"❓ {input_data}\n(Reply to continue)", sender)
             save_plan_state(sender, plan, i + 1, context)
             return  
+
+        # RESEARCH TOOL
+        elif tool == "research":
+            await stream_status("🔍 Researching...", sender)
+            result = web_search(input_data)
+            await stream_status("📚 Research complete", sender)
+            context[f"step_{step_num}"] = result  
 
         # Tool execution
         else:

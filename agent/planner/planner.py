@@ -18,6 +18,7 @@ Tools:
 - filesystem
 - ask_user
 - reply
+-research 
 
 Return JSON:
 {

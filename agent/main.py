@@ -70,9 +70,9 @@ async def handle_message(msg: Message):
 
             await stream_status("🔄 Resuming task...", sender)
 
-            await execute_plan(plan, sender)
+            await execute_plan(plan, sender, start_index=step_index, context=context)
 
-            return {"reply": "Continuing..."} 
+            return {"reply": ""}
 
         # classify intent
         intent = classify_intent(user_text)["intent"]
@@ -122,7 +122,7 @@ async def handle_message(msg: Message):
             plan = create_plan(original_text)
             await stream_status("Creating plan...", sender)
             await execute_plan(plan, sender)
-            return {"reply": "Working on it..."}
+            return {"reply": ""}
 
         else:
             reply = "I'm not sure what you mean, can you rephrase?"      

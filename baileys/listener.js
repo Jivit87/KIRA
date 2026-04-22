@@ -31,7 +31,9 @@ async function startListener(sock) {
             const reply = res.data.reply;
 
             // Send reply back to WhatsApp
-            await sock.sendMessage(sender, { text: reply });
+            if (reply) {
+                await sock.sendMessage(sender, { text: reply });
+            }
 
         } catch (err) {
             console.error("❌ Error:", err.message);

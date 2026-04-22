@@ -16,6 +16,7 @@ from streaming import stream_status
 
 from planner.planner import create_plan
 from planner.executor import execute_plan
+from planner.state import get_plan_state, clear_plan_state
 
 app = FastAPI()
 groq_client = Groq() 
@@ -53,7 +54,25 @@ async def handle_message(msg: Message):
             result = run_action(pending["original_text"])
             await stream_status(f"✅ {result}", sender)
             return {"reply": f"Executed: {result}"}
-                
+
+        state = get_plan_state(sender)
+
+        # RESUME PLAN
+        if state:
+            if user_text not in ["yes", "no"]:
+                return {"reply": "⚠️ Please reply YES or NO to continue"}
+
+            plan = state["plan"]
+            step_index = state["step_index"]
+            context = state["context"]
+
+            clear_plan_state(sender)
+
+            await stream_status("🔄 Resuming task...", sender)
+
+            await execute_plan(plan, sender)
+
+            return {"reply": "Continuing..."} 
 
         # classify intent
         intent = classify_intent(user_text)["intent"]

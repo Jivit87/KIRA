@@ -1,6 +1,7 @@
 from tools.router import run_action
 from streaming import stream_status
 from tool_intelligence.router import intelligent_tool_call
+from .state import save_plan_state 
 
 FALLBACKS = {
     "open vscode": "open code",
@@ -8,11 +9,14 @@ FALLBACKS = {
 }
 
 
-async def execute_plan(plan, sender):
+async def execute_plan(plan, sender, start_index=0, context=None):
     steps = plan.get("steps", [])
-    context = {}
+    context = context or {}
 
-    for step in steps:
+    for i, step in enumerate(steps):
+        if i < start_index:
+            continue
+
         step_num = step.get("step")
         if not step_num:
             continue
@@ -35,7 +39,8 @@ async def execute_plan(plan, sender):
         # Ask user (pause execution)
         elif tool == "ask_user":
             await stream_status(f"❓ {input_data}\n(Reply to continue)", sender)
-            return  # future: resume from here
+            save_plan_state(sender, plan, i + 1, context)
+            return  
 
         # Tool execution
         else:

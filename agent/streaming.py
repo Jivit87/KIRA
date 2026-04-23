@@ -1,13 +1,13 @@
 import httpx
 
-BAILEYS_URL = "http://localhost:8766/send"
+BAILEYS_SEND_URL = "http://127.0.0.1:8766/send"
 
-async def stream_status(text: str, to: str):
-    try:
-        async with httpx.AsyncClient() as client:
-            await client.post(BAILEYS_URL, json={
-                "text": text,
-                "to": to
-            })
-    except Exception as e:
-        print("Streaming error:", e)
+
+async def stream_status(text: str):
+    # Send an immediate status update to WhatsApp.
+    
+    async with httpx.AsyncClient(timeout=5.0) as client:
+        try:
+            await client.post(BAILEYS_SEND_URL, json={"text": text})
+        except Exception as e:
+            print(f"⚠️ stream_status failed: {e}")

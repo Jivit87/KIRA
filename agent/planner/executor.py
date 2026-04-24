@@ -1,87 +1,101 @@
-from tools.router import run_action
+import os
+from groq import Groq
 from streaming import stream_status
 from tool_intelligence.router import intelligent_tool_call
-from .state import save_plan_state 
-from tools.research import web_search
+from utils.risk_detector import is_risky
+from confirmation import request_confirmation
+from planner.state import save_plan_state
 
-FALLBACKS = {
-    "open vscode": "open code",
-    "open chrome": "open safari"
-}
+groq_client = Groq(api_key=os.getenv("GROQ_API_KEY"))
 
 
-async def execute_plan(plan, sender, start_index=0, context=None):
+async def execute_plan(plan: dict, sender: str, start_index: int = 0, context: dict = None):
+    """
+    Execute a plan step by step.
+
+    plan:        the plan dict from create_plan() with a "steps" list
+    sender:      WhatsApp JID — used to send status messages and save state
+    start_index: which step to start from (used when resuming a paused plan)
+    context:     results from already-completed steps (passed forward)
+    """
     steps = plan.get("steps", [])
-    context = context or {}
+    context = context or {}  # stores output from each step, passed to next steps
 
     for i, step in enumerate(steps):
+        # Skip steps we already completed (when resuming)
         if i < start_index:
             continue
 
-        step_num = step.get("step")
-        if not step_num:
-            continue
+        step_num   = step.get("step", i + 1)
+        tool       = step.get("tool", "")
+        params     = step.get("params", {})
+        desc       = step.get("description", "")
+        is_critical = step.get("critical", False)
 
-        action = step.get("action", "")
-        tool = step.get("tool", "")
-        input_data = step.get("input", "")
+        # Show the user what we're doing right now
+        await stream_status(f"⏳ Step {step_num}: {desc}")
 
-        # Debug (important for dev)
-        print(f"[Tool] {tool} → {input_data}")
-
-        # Step status
-        await stream_status(f"⏳ Step {step_num}: {action}", sender)
-
-        # Direct reply
-        if tool == "reply":
-            await stream_status(input_data, sender)
-            continue
-
-        # Ask user (pause execution)
-        elif tool == "ask_user":
-            await stream_status(f"❓ {input_data}\n(Reply to continue)", sender)
+        # ── ask_user ──────────────────────────────────────────────────────────
+        # Pause the plan and wait for the user to reply before continuing
+        if tool == "ask_user":
+            question = params.get("question", desc)
+            await stream_status(f"❓ {question}\n\nReply to continue.")
+            # Save state so we can resume from the NEXT step after user replies
             save_plan_state(sender, plan, i + 1, context)
-            return  
+            return  # stop here — orchestrator will resume on next message
 
-        # RESEARCH TOOL
-        elif tool == "research":
-            await stream_status("🔍 Researching...", sender)
-            result = web_search(input_data)
-            await stream_status("📚 Research complete", sender)
-            context[f"step_{step_num}"] = result  
+        # ── llm_reply ─────────────────────────────────────────────────────────
+        # Generate a text summary using the LLM — no tool call
+        if tool == "llm_reply":
+            prompt = params.get("prompt", desc)
+            # Include context from previous steps in the summary
+            context_summary = "\n".join(
+                f"Step {k}: {v}" for k, v in context.items()
+            )
+            full_prompt = f"{prompt}\n\nCompleted steps:\n{context_summary}" if context_summary else prompt
 
-        # Tool execution
-        else:
-            # Pass context (basic memory)
-            enriched_input = f"{input_data} | context: {context}"
+            try:
+                response = groq_client.chat.completions.create(
+                    model=os.getenv("GROQ_MODEL", "llama-3.3-70b-versatile"),
+                    messages=[
+                        {"role": "system", "content": "Summarize the completed task results for the user. Be concise. Plain text only."},
+                        {"role": "user",   "content": full_prompt}
+                    ]
+                )
+                reply = response.choices[0].message.content
+            except Exception as e:
+                reply = f"✅ Steps completed. (Summary failed: {e})"
 
-            result = await intelligent_tool_call(enriched_input)
+            await stream_status(reply)
+            context[f"step_{step_num}"] = reply
+            continue
 
-            # Handle failure
-            if result.get("error"):
-                fallback = None
+        # ── regular tool ──────────────────────────────────────────────────────
+        # Check if this tool + params is risky before running
+        risky, reason = is_risky(tool, params)
 
-                # smarter fallback match
-                for key in FALLBACKS:
-                    if key in input_data.lower():
-                        fallback = FALLBACKS[key]
-                        break
+        if risky:
+            # Ask for confirmation — pause the plan
+            await request_confirmation(sender, tool, params, reason)
+            # Save state so we can resume from THIS step after YES
+            save_plan_state(sender, plan, i, context)
+            return  # stop here — orchestrator resumes after YES/NO
 
-                if fallback:
-                    await stream_status(f"🔄 Trying fallback: {fallback}", sender)
-                    result = await intelligent_tool_call(fallback)
+        # Run the tool through the intelligence layer (retry + fallback)
+        result = await intelligent_tool_call(tool, params)
 
-                # still failed
-                if result.get("error"):
-                    await stream_status(f"❌ Failed: {result['error']}", sender)
-                    await stream_status("⚠️ Skipping step due to failure", sender)
-                    continue
+        if result["error"]:
+            await stream_status(f"⚠️ Step {step_num} failed: {result['error']}")
 
-            # Success
-            output = result.get("output", "No output")
-            await stream_status(f"✅ {output}", sender)
+            if is_critical:
+                await stream_status("❌ Critical step failed. Aborting plan.")
+                return
+            else:
+                await stream_status("⏭ Skipping and continuing...")
+                continue
 
-            # Save context
-            context[f"step_{step_num}"] = output
+        # Step succeeded — save output to context for future steps
+        output = result["output"]
+        context[f"step_{step_num}"] = output
 
-    await stream_status("🎉 Plan completed", sender)
+    await stream_status("✅ Plan complete.")

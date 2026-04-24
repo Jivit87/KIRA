@@ -12,6 +12,10 @@ from tool_intelligence.router import intelligent_tool_call
 from planner.planner import create_plan
 from planner.executor import execute_plan
 from planner.state import get_plan_state, clear_plan_state
+from utils.formatter import format_reply
+from utils.logger import get_logger
+
+logger = get_logger(__name__)
 
 BAILEYS_SEND_URL = "http://127.0.0.1:8766/send"
 
@@ -46,11 +50,13 @@ Respond ONLY with JSON:
 
 async def send(text: str):
     """Send a message back to WhatsApp via Baileys."""
+    # Format before sending — strip markdown, truncate if too long
+    text = format_reply(text)
     async with httpx.AsyncClient(timeout=10.0) as client:
         try:
             await client.post(BAILEYS_SEND_URL, json={"text": text})
         except Exception as e:
-            print(f"❌ Failed to send reply: {e}")
+            logger.error(f"Failed to send reply: {e}")
 
 
 async def llm_chat(text: str, memory_context: str = "") -> str:
@@ -197,7 +203,7 @@ async def handle_message(text: str, msg_id: str):
 
     # 5. Classify intent
     intent = classify_intent(text).get("intent", "chat")
-    print(f"🧠 Intent: {intent}")
+    logger.info(f"Intent: {intent} | Message: {text[:60]}")
 
     reply = ""
 
@@ -224,7 +230,7 @@ async def handle_message(text: str, msg_id: str):
             await send(reply)
 
     except Exception as e:
-        print(f"❌ Error: {e}")
+        logger.error(f"Error handling message: {e}")
         await send("⚠️ Something went wrong. Try again.")
         return
 

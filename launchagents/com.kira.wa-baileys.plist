@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <!-- Unique label for this LaunchAgent -->
+  <key>Label</key>
+  <string>com.kira.wa-baileys</string>
+
+  <!-- Command to run: node client.js -->
+  <key>ProgramArguments</key>
+  <array>
+    <string>/usr/local/bin/node</string>
+    <string>/Users/jivitrana/Desktop/Kira/baileys/client.js</string>
+  </array>
+
+  <!-- Run from the baileys directory -->
+  <key>WorkingDirectory</key>
+  <string>/Users/jivitrana/Desktop/Kira/baileys</string>
+
+  <!-- Start at login -->
+  <key>RunAtLoad</key>
+  <true/>
+
+  <!-- Restart if it crashes -->
+  <key>KeepAlive</key>
+  <true/>
+
+  <!-- Log output -->
+  <key>StandardOutPath</key>
+  <string>/tmp/wa-baileys.log</string>
+  <key>StandardErrorPath</key>
+  <string>/tmp/wa-baileys.err</string>
+
+  <!-- Pass Redis URL as environment variable -->
+  <key>EnvironmentVariables</key>
+  <dict>
+    <key>REDIS_URL</key>
+    <string>redis://localhost:6379</string>
+  </dict>
+</dict>
+</plist>

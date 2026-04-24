@@ -62,9 +62,13 @@ htmlcov/
 
 # ChromaDB vector store (can be large)
 data/
+agent/chroma_db/
 *.db
 *.sqlite
 *.sqlite3
+
+# Redis dump
+dump.rdb
 
 # Mem0 local cache
 .mem0/

@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <!-- Unique label for this LaunchAgent -->
+  <key>Label</key>
+  <string>com.kira.wa-agent</string>
+
+  <!-- Command to run: uvicorn inside the venv -->
+  <key>ProgramArguments</key>
+  <array>
+    <string>/Users/jivitrana/Desktop/Kira/agent/.venv/bin/uvicorn</string>
+    <string>main:app</string>
+    <string>--host</string>
+    <string>127.0.0.1</string>
+    <string>--port</string>
+    <string>8765</string>
+  </array>
+
+  <!-- Run from the agent directory so imports work -->
+  <key>WorkingDirectory</key>
+  <string>/Users/jivitrana/Desktop/Kira/agent</string>
+
+  <!-- Start at login -->
+  <key>RunAtLoad</key>
+  <true/>
+
+  <!-- Restart if it crashes -->
+  <key>KeepAlive</key>
+  <true/>
+
+  <!-- Log output -->
+  <key>StandardOutPath</key>
+  <string>/tmp/wa-agent.log</string>
+  <key>StandardErrorPath</key>
+  <string>/tmp/wa-agent.err</string>
+</dict>
+</plist>

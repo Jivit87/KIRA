@@ -4,11 +4,14 @@ import subprocess
 def system_control(action: str, value: str = "") -> str:
     """
     Control macOS system settings via AppleScript.
-    action: volume | sleep | lock | wifi
-    value:  number 0-100 for volume, "on"/"off" for wifi
+    action: volume | sleep | lock | wifi | get_date
+    value:  0-100 OR low|medium|high|mute for volume; on|off for wifi
     """
     if action == "volume" and value:
-        script = f'set volume output volume {value}'
+        # Map named levels to numeric values
+        level_map = {"mute": 0, "low": 25, "medium": 50, "high": 85}
+        numeric = level_map.get(str(value).lower(), value)
+        script = f'set volume output volume {numeric}'
 
     elif action == "sleep":
         script = 'tell application "System Events" to sleep'
@@ -22,6 +25,9 @@ def system_control(action: str, value: str = "") -> str:
 
     elif action == "wifi" and value == "off":
         script = 'do shell script "networksetup -setairportpower en0 off"'
+
+    elif action == "get_date":
+        script = 'do shell script "date \'+%A, %B %d, %Y %H:%M:%S\'"'
 
     else:
         return f"❌ Unknown system action: {action} {value}"

@@ -20,8 +20,8 @@ def filesystem_op(operation: str, path: str, destination: str = "", query: str =
         return "\n".join(str(i) for i in items[:50]) or "Empty directory"
 
     elif operation == "find":
-        # Search from home directory by default
-        matches = list(pathlib.Path("~/").expanduser().rglob(query))[:20]
+        search_root = pathlib.Path(path).expanduser() if path else pathlib.Path.home()
+        matches = list(search_root.rglob(query))[:20]
         return "\n".join(str(m) for m in matches) if matches else "No matches found."
 
     elif operation == "read":

@@ -29,7 +29,9 @@ async function startWhatsApp() {
             const shouldReconnect = update.lastDisconnect?.error?.output?.statusCode !== DisconnectReason.loggedOut;
             console.log("⚠️ Connection closed, reconnecting:", shouldReconnect);
             if (shouldReconnect) {
-                startWhatsApp();
+                // Close the current socket cleanly before spawning a new one
+                try { sock.ws.close(); } catch (_) {}
+                setTimeout(startWhatsApp, 3000);
             }
         }
     });

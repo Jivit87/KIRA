@@ -1,12 +1,5 @@
-import redis
 import json
-import os
-
-# Redis connection for storing paused plan state
-r = redis.Redis.from_url(
-    os.getenv("REDIS_URL", "redis://localhost:6379"),
-    decode_responses=True
-)
+from memory.redis_client import r
 
 TTL = 300  # plan state expires after 5 minutes of inactivity
 

@@ -13,9 +13,15 @@ function startSender(sock) {
         }
 
         try {
-            // Send to Saved Messages (your own number)
-            const jid = sock.user.id.replace(':0@', '@s.whatsapp.net');
-            await sock.sendMessage(jid, { text });
+            // Try phone JID first, fall back to LID if that fails
+            // Normalize: strip device suffix e.g. ":30"
+            const phoneJid = sock.user.id.replace(/:\d+@/, "@");
+            const lidJid   = sock.user.lid ? sock.user.lid.replace(/:\d+@/, "@") : null;
+
+            // Use phone JID first (more reliable), fall back to LID
+            const targetJid = phoneJid || lidJid;
+
+            await sock.sendMessage(targetJid, { text });
             res.json({ ok: true });
         } catch (err) {
             console.error("❌ Send error:", err.message);

@@ -24,8 +24,14 @@ config = {
     }
 }
 
-# Single shared memory instance — reused across all calls
-memory = Memory.from_config(config)
+# Lazily initialized — avoids blocking Ollama connection at import time
+_memory = None
+
+def _get_memory():
+    global _memory
+    if _memory is None:
+        _memory = Memory.from_config(config)
+    return _memory
 
 
 def add_memory(user_text: str, assistant_text: str):
@@ -33,13 +39,16 @@ def add_memory(user_text: str, assistant_text: str):
     Save a conversation exchange to long-term memory.
     Mem0 automatically decides what's worth keeping.
     """
-    memory.add(
-        messages=[
-            {"role": "user",      "content": user_text},
-            {"role": "assistant", "content": assistant_text}
-        ],
-        user_id="me"
-    )
+    try:
+        _get_memory().add(
+            messages=[
+                {"role": "user",      "content": user_text},
+                {"role": "assistant", "content": assistant_text}
+            ],
+            user_id="me"
+        )
+    except Exception as e:
+        print(f"⚠️ add_memory failed: {e}")
 
 
 def search_memory(query: str, limit: int = 5) -> list:
@@ -47,7 +56,7 @@ def search_memory(query: str, limit: int = 5) -> list:
     Search past memory for context relevant to the current message.
     Returns a list of dicts like: [{"memory": "user likes dark themes", ...}]
     """
-    results = memory.search(query, user_id="me", limit=limit)
+    results = _get_memory().search(query, user_id="me", limit=limit)
 
     # mem0 can return either a list or a dict with a "results" key
     if isinstance(results, dict):

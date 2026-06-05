@@ -17,6 +17,9 @@ HARD_RISKY_PATTERNS = [
     r"dd\s+if=",          # disk copy (can wipe drives)
     r">\s*/dev/",         # write to device file
     r":\(\)\{.*\}",       # fork bomb
+    r"\$\s*\(",           # command substitution $(...)
+    r"`[^`]+`",           # backtick command substitution
+    r"\|\s*\w",           # pipe chain — command | command
 ]
 
 # Layer 2: Groq scores ambiguous commands as low / medium / high

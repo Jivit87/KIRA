@@ -1,3 +1,5 @@
+import re
+
 MAX_LENGTH = 3000  # WhatsApp message character limit
 
 
@@ -12,7 +14,8 @@ def format_reply(text: str) -> str:
 
     # Remove common markdown symbols
     text = text.replace("**", "")   # bold
-    text = text.replace("__", "")   # underline
+    # Only strip __ when used as markdown delimiters (not inside words like __init__)
+    text = re.sub(r'(?<!\w)__(?!\w)', "", text)
     text = text.replace("```", "")  # code blocks
     text = text.replace("`", "")    # inline code
     text = text.replace("### ", "").replace("## ", "").replace("# ", "")  # headers

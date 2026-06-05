@@ -18,12 +18,17 @@ app.middleware("http")(rate_limit_middleware)
 class Message(BaseModel):
     text: str
     msg_id: str
+    sender: str
 
 
 @app.post("/message")
 async def receive_message(msg: Message):
     """Baileys POSTs here when you send a message to yourself on WhatsApp."""
-    await handle_message(msg.text, msg.msg_id)
+    try:
+        await handle_message(msg.text, msg.msg_id, msg.sender)
+    except Exception as e:
+        # Log but don't crash — Baileys needs a 200 back or it will retry
+        print(f"[ERROR] handle_message failed: {e}")
     return {"ok": True}
 
 

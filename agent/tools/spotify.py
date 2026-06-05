@@ -20,7 +20,10 @@ def spotify_control(action: str, query: str = "") -> str:
         script = 'tell application "Spotify" to previous track'
 
     elif action == "search" and query:
-        script = f'tell application "Spotify" to search for "{query}"'
+        # AppleScript "search for" is not a valid Spotify command.
+        # Use the spotify: URI scheme instead — opens Spotify and runs the search.
+        encoded = query.replace(" ", "%20")
+        script = f'open location "spotify:search:{encoded}"'
 
     elif action == "volume" and query:
         script = f'tell application "Spotify" to set sound volume to {query}'

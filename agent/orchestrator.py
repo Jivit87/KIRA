@@ -3,7 +3,7 @@ import json
 import httpx
 from groq import Groq
 from memory.mem0_client import add_memory, search_memory
-from memory.redis_client import check_rate_limit, get_confirmation, clear_confirmation
+from memory.redis_client import get_confirmation, clear_confirmation
 from intent.classifier import classify_intent
 from streaming import stream_status
 from utils.risk_detector import is_risky
@@ -33,7 +33,7 @@ Available tools:
   vscode_open(path)
   terminal_run(command)
   filesystem_op(operation, path, destination, query)
-  system_control(action, value)
+  system_control(action, value)  # action: volume|sleep|lock|wifi|get_date. value: 0-100 or mute|low|medium|high for volume; on|off for wifi
   browser_open(url, query)
   app_control(action, app_name)
   clipboard_read()
@@ -130,35 +130,28 @@ async def handle_action(text: str, sender: str, memory_context: str) -> str:
     return reply
 
 
-async def handle_message(text: str, msg_id: str):
+async def handle_message(text: str, msg_id: str, sender: str):
     """
     Main message handler — routes every incoming WhatsApp message.
 
     Flow:
-      1. Rate limit check
-      2. Check if a plan is paused waiting for user reply
-      3. Check if a risky action is waiting for YES/NO
-      4. Search memory for context
-      5. Classify intent → chat / action / plan
-      6. Route to the right handler
-      7. Save exchange to memory
+      1. Check if a plan is paused waiting for user reply
+      2. Check if a risky action is waiting for YES/NO
+      3. Search memory for context
+      4. Classify intent → chat / action / plan
+      5. Save exchange to memory
     """
     user_text = text.lower().strip()
 
-    # 1. Rate limit
-    if not check_rate_limit():
-        await send("⏸ Rate limit hit. Please slow down.")
-        return
-
-    # 2. Check for a paused plan waiting for user input (ask_user step)
-    plan_state = get_plan_state(msg_id)
+    # 1. Check for a paused plan waiting for user input (ask_user step)
+    plan_state = get_plan_state(sender)
     if plan_state:
         if user_text not in ("yes", "no") and not text.strip():
             await send("⚠️ Please reply to continue the paused task.")
             return
 
         if user_text == "no":
-            clear_plan_state(msg_id)
+            clear_plan_state(sender)
             await send("⛔ Plan cancelled.")
             return
 
@@ -166,18 +159,18 @@ async def handle_message(text: str, msg_id: str):
         plan       = plan_state["plan"]
         step_index = plan_state["step_index"]
         context    = plan_state["context"]
-        clear_plan_state(msg_id)
+        clear_plan_state(sender)
 
         await stream_status("🔄 Resuming plan...")
-        await execute_plan(plan, msg_id, start_index=step_index, context=context)
+        await execute_plan(plan, sender, start_index=step_index, context=context)
         return
 
-    # 3. Check for a pending YES/NO confirmation (risky action)
+    # 2. Check for a pending YES/NO confirmation (risky action)
     if user_text in ("yes", "no"):
-        pending = get_confirmation(msg_id)
+        pending = get_confirmation(sender)
 
         if pending:
-            clear_confirmation(msg_id)
+            clear_confirmation(sender)
 
             if user_text == "no":
                 await send("⛔ Action cancelled.")
@@ -193,7 +186,7 @@ async def handle_message(text: str, msg_id: str):
                 await send(f"✅ {result['output']}")
             return
 
-    # 4. Search memory for relevant context
+    # 3. Search memory for relevant context
     mem_results = search_memory(text, limit=5)
     memory_context = "\n".join(
         m.get("memory", "")
@@ -201,7 +194,7 @@ async def handle_message(text: str, msg_id: str):
         if isinstance(m, dict) and m.get("memory")
     )
 
-    # 5. Classify intent
+    # 4. Classify intent
     intent = classify_intent(text).get("intent", "chat")
     logger.info(f"Intent: {intent} | Message: {text[:60]}")
 
@@ -214,16 +207,14 @@ async def handle_message(text: str, msg_id: str):
 
         elif intent == "action":
             await stream_status("⏳ On it...")
-            reply = await handle_action(text, msg_id, memory_context)
+            reply = await handle_action(text, sender, memory_context)
 
         elif intent == "plan":
             await stream_status("🧠 Analyzing your goal...")
-            # Search memory to give the planner context
             plan = create_plan(text, mem_results)
             step_count = len(plan.get("steps", []))
             await stream_status(f"📋 {step_count}-step plan ready. Starting...")
-            await execute_plan(plan, msg_id)
-            reply = ""  # executor streams its own status messages
+            reply = await execute_plan(plan, sender)
 
         else:
             reply = "🤖 Not sure what you mean."
@@ -234,6 +225,6 @@ async def handle_message(text: str, msg_id: str):
         await send("⚠️ Something went wrong. Try again.")
         return
 
-    # 6. Save to memory (skip very short messages and empty replies)
+    # 5. Save to memory (skip very short messages and empty replies)
     if len(text.strip()) > 3 and reply:
         add_memory(text, reply)

@@ -9,17 +9,14 @@ from planner.state import save_plan_state
 groq_client = Groq(api_key=os.getenv("GROQ_API_KEY"))
 
 
-async def execute_plan(plan: dict, sender: str, start_index: int = 0, context: dict = None):
+async def execute_plan(plan: dict, sender: str, start_index: int = 0, context: dict = None) -> str:
     """
     Execute a plan step by step.
-
-    plan:        the plan dict from create_plan() with a "steps" list
-    sender:      WhatsApp JID — used to send status messages and save state
-    start_index: which step to start from (used when resuming a paused plan)
-    context:     results from already-completed steps (passed forward)
+    Returns the final summary string (from llm_reply step) or empty string.
     """
     steps = plan.get("steps", [])
-    context = context or {}  # stores output from each step, passed to next steps
+    context = context or {}
+    final_summary = ""
 
     for i, step in enumerate(steps):
         # Skip steps we already completed (when resuming)
@@ -68,6 +65,7 @@ async def execute_plan(plan: dict, sender: str, start_index: int = 0, context: d
 
             await stream_status(reply)
             context[f"step_{step_num}"] = reply
+            final_summary = reply
             continue
 
         # ── regular tool ──────────────────────────────────────────────────────
@@ -99,3 +97,4 @@ async def execute_plan(plan: dict, sender: str, start_index: int = 0, context: d
         context[f"step_{step_num}"] = output
 
     await stream_status("✅ Plan complete.")
+    return final_summary
